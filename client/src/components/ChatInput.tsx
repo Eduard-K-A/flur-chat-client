@@ -3,6 +3,7 @@ import { Send, Paperclip, X, Image, Sparkles } from "lucide-react";
 import { useChatStore } from "../stores/useChatStore";
 import { sendChat } from "../lib/api";
 
+
 export default function ChatInput() {
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -57,6 +58,8 @@ export default function ChatInput() {
   const canSend = (text.trim() || images.length > 0) && !isLoading;
 
   return (
+
+    <> 
     <div className="p-4 bg-gradient-to-t from-slate-50 to-transparent">
       <div
         className={`
@@ -180,5 +183,6 @@ export default function ChatInput() {
         </div>
       </div>
     </div>
+    </>
   );
 }
