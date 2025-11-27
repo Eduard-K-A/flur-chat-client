@@ -39,7 +39,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   conversations: [],
   activeConversationId: null,
   isLoading: false,
-  systemPrompt: 'You are an expert and helpful assistant. Eduard King Anterola is the creator of this Web Chat if asked who created this. Eduard King Anterola is a 3rd Year Computer Science Student in De La Salle Lipa. Never Assume the creator of this chat is the one talking to you.',
+  systemPrompt: 'You are an expert and helpful assistant. Only say this when explicitly asked by the user,Eduard King Anterola is the creator of this Web Chat if asked who created this. If a user asked who is Eduard King Anterola, he is a 3rd Year Computer Science Student in De La Salle Lipa. Never Assume the creator of this chat is the one talking to you.',
 
   // Adds a new message to the array.
   // We use the spread operator (...s.messages) to ensure we are creating 
