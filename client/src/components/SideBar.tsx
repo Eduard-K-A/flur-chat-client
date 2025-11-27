@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState} from 'react';
 import { MessageSquare, Plus, Search, Settings } from 'lucide-react';
 import { useChatStore } from '../stores/useChatStore';
 
@@ -14,44 +14,39 @@ interface SideBarProps {
 
 export default function ChatbotSidebar({ isOpen }: SideBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const { messages, clear } = useChatStore();
+  const { messages, conversations, newConversation, switchConversation, deleteConversation, activeConversationId } = useChatStore();
 
-  // We show a single 'Current conversation' entry to match the simple chat
-  // store. This enables the sidebar to reflect what's in the store and let
-  // the user start over.
-  const chats: Chat[] = [
-    {
-      id: 'current',
-      title: messages.length > 0 ? 'Current Conversation' : 'No Conversation',
-      timestamp:
-        messages.length > 0
-          ? `${messages.length} message${messages.length > 1 ? 's' : ''}`
-          : '—',
-    },
+  // Build the list of chats (active unsaved + saved conversations)
+  const currentTitle = messages.length > 0 ? 'Current Conversation' : 'No Conversation';
+
+  const chatEntries: Chat[] = [
+    { id: 'current', title: currentTitle, timestamp: messages.length > 0 ? `${messages.length} message${messages.length > 1 ? 's' : ''}` : '—' },
+    ...conversations.map((c) => ({ id: c.id, title: c.title, timestamp: c.createdAt })),
   ];
 
-  const filteredChats = chats.filter(chat =>
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredChats = chatEntries.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-screen">
       {/* Sidebar */}
       <div
-        className={`${
-          isOpen ? 'w-64' : 'w-0'
-        } transition-all duration-300 bg-white border-r border-slate-200 flex flex-col overflow-hidden`}
+        className={`${isOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white border-r border-slate-200 flex flex-col overflow-hidden sticky top-0 h-screen z-10`}
       >
         {/* Header */}
-          <div className="p-4 border-b border-slate-200">
-          <button
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-linear-to-r from-violet-500 to-indigo-500 text-white rounded-lg hover:scale-[1.02] transition-transform shadow-md"
-            onClick={() => clear()}
-          >
-            <Plus size={20} />
-            <span className="font-medium">New Chat</span>
-          </button>
-        </div>
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img src="/assets/robotLogo.jpg" alt="Flur Chat" className="h-8 w-8 rounded-full" />
+              <div className="text-sm font-semibold text-slate-700">Flur Chat</div>
+            </div>
+            <button
+              className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-violet-500 to-indigo-500 text-white rounded-lg hover:scale-[1.02] transition-transform shadow-md"
+              onClick={() => newConversation()}
+              title="Start a new chat (saves the current one)"
+            >
+              <Plus size={16} />
+              <span className="text-sm font-medium">New</span>
+            </button>
+          </div>
 
         {/* Search */}
         <div className="p-4 border-b border-slate-200">
@@ -70,13 +65,27 @@ export default function ChatbotSidebar({ isOpen }: SideBarProps) {
         {/* Chat History */}
         <div className="flex-1 overflow-y-auto p-2">
           {filteredChats.map((chat) => (
-            <button
+            <div
               key={chat.id}
-              className="w-full text-left px-3 py-3 rounded-lg hover:bg-slate-100 transition-colors mb-1 group"
+              role="button"
+              tabIndex={0}
+              className={`w-full text-left px-3 py-3 rounded-lg hover:bg-slate-100 transition-colors mb-1 group cursor-pointer ${((chat.id === 'current' && activeConversationId === null) || activeConversationId === chat.id) ? 'bg-slate-100' : ''}`}
               onClick={() => {
-                // On click, focus messages list if available.
+                if (chat.id === 'current') {
+                  switchConversation('current');
+                } else {
+                  switchConversation(chat.id);
+                }
                 const el = document.getElementById('messages-list');
-                el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (chat.id === 'current') switchConversation('current'); else switchConversation(chat.id);
+                  const el = document.getElementById('messages-list');
+                  el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                }
               }}
             >
               <div className="flex items-start gap-3">
@@ -85,12 +94,22 @@ export default function ChatbotSidebar({ isOpen }: SideBarProps) {
                   <p className="text-sm font-medium text-slate-900 truncate">
                     {chat.title}
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">
-                    {messages.length > 0 ? `${messages[messages.length - 1].role}: ${String(messages[messages.length - 1].content).slice(0,50)}${String(messages[messages.length - 1].content).length > 50 ? '…' : ''}` : 'No messages yet'}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    { (chat.id === 'current' && messages.length > 0) ? `${messages[messages.length - 1].role}: ${String(messages[messages.length - 1].content).slice(0,50)}${String(messages[messages.length - 1].content).length > 50 ? '…' : ''}` : (chat.id !== 'current' ? (new Date(chat.timestamp).toLocaleString() || chat.timestamp) : 'No messages yet') }
                   </p>
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (chat.id !== 'current') deleteConversation(chat.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-xs text-slate-400 hover:text-red-500 p-1 transition-opacity"
+                  aria-label="Delete chat"
+                >
+                  Delete
+                </button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
 
