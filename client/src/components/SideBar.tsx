@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MessageSquare, Plus, Search, Settings } from 'lucide-react';
 import { useChatStore } from '../stores/useChatStore';
 
