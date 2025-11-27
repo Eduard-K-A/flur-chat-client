@@ -7,8 +7,9 @@ import { sendChat } from "../lib/api";
 export default function ChatInput() {
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [showSystemEditor, setShowSystemEditor] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const { addMessage, appendToLastMessage, setLoading, isLoading } = useChatStore();
+  const { addMessage, appendToLastMessage, setLoading, isLoading, systemPrompt, setSystemPrompt } = useChatStore();
 
   const processImage = (file: File) => {
     const reader = new FileReader();
@@ -30,10 +31,20 @@ export default function ChatInput() {
     setLoading(true);
     addMessage({ role: "assistant", content: "" });
 
-    const reader = await sendChat([
-      ...useChatStore.getState().messages.slice(0, -1),
-      { role: "user", content: userContent.length === 1 ? text : userContent },
-    ]);
+    // Build the messages payload to include the system prompt (if set) as
+    // the first message. We avoid adding the system prompt to the UI messages
+    // so it stays hidden from the chat history but influences model behavior.
+    const currentMessages = useChatStore.getState().messages.slice(0, -1);
+    const payloadMessages: any[] = [];
+    if (systemPrompt && String(systemPrompt).trim()) {
+      // Only add system prompt if not already present at the beginning of payload
+      const firstIsSystem = currentMessages[0]?.role === "system";
+      if (!firstIsSystem) payloadMessages.push({ role: "system", content: systemPrompt });
+    }
+    payloadMessages.push(...currentMessages);
+    payloadMessages.push({ role: "user", content: userContent.length === 1 ? text : userContent });
+
+    const reader = await sendChat(payloadMessages);
 
     const decoder = new TextDecoder();
     while (true) {
@@ -60,7 +71,7 @@ export default function ChatInput() {
   return (
 
     <> 
-    <div className="p-4 bg-gradient-to-t from-slate-50 to-transparent">
+    <div className="p-4 bg-linear-to-t from-slate-50 to-transparent">
       <div
         className={`
           relative mx-auto max-w-3xl rounded-2xl
@@ -76,7 +87,7 @@ export default function ChatInput() {
               {images.map((img, i) => (
                 <div
                   key={i}
-                  className="relative group flex-shrink-0 rounded-xl overflow-hidden"
+                  className="relative group shrink-0 rounded-xl overflow-hidden"
                 >
                   <img
                     src={img}
@@ -95,7 +106,7 @@ export default function ChatInput() {
                 </div>
               ))}
               <label
-                className="flex-shrink-0 h-20 w-20 rounded-xl border-2 border-dashed 
+                className="shrink-0 h-20 w-20 rounded-xl border-2 border-dashed 
                            border-slate-200 hover:border-violet-300 hover:bg-violet-50
                            flex items-center justify-center cursor-pointer transition-colors"
               >
@@ -132,11 +143,21 @@ export default function ChatInput() {
             />
           </label>
 
+          {/* Toggle the system prompt editor */}
+          <button
+            type="button"
+            onClick={() => setShowSystemEditor((v) => !v)}
+            className="p-2.5 rounded-xl text-slate-400 hover:text-violet-500 hover:bg-violet-50 cursor-pointer transition-colors"
+            title="Edit system prompt"
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
+
           <textarea
             className="flex-1 resize-none bg-transparent text-slate-700 
                        placeholder:text-slate-400 focus:outline-none
                        text-sm leading-relaxed py-2.5 px-1
-                       min-h-[44px] max-h-[200px]"
+                       min-h-11 max-h-[200px]"
             placeholder="Message AI assistant..."
             rows={1}
             value={text}
@@ -161,7 +182,7 @@ export default function ChatInput() {
             className={`
               p-2.5 rounded-xl transition-all duration-200
               ${canSend
-                ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 hover:scale-105 active:scale-95"
+                ? "bg-linear-to-r from-violet-500 to-indigo-500 text-white shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 hover:scale-105 active:scale-95"
                 : "bg-slate-100 text-slate-400 cursor-not-allowed"
               }
             `}
@@ -175,6 +196,18 @@ export default function ChatInput() {
         </div>
 
         {/* Hint Text */}
+        {showSystemEditor && (
+          <div className="p-3 border-b border-slate-100 bg-white">
+            <textarea
+              className="w-full rounded-md border border-slate-200 p-2 text-sm resize-none"
+              rows={3}
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="System prompt: instruct the assistant (hidden from chat history)"
+            />
+          </div>
+        )}
+
         <div className="px-4 pb-2 flex items-center justify-between text-xs text-slate-400">
           <span>Press Enter to send, Shift+Enter for new line</span>
           {images.length > 0 && (
