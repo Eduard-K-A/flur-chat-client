@@ -28,7 +28,7 @@ export default function MessagesList() {
     <div
       id="messages-list"
       ref={containerRef}
-      className="mx-auto max-w-3xl p-4 h-full overflow-y-auto"
+      className="w-full p-4"
     >
       <div className="flex flex-col gap-4">
 
@@ -60,7 +60,7 @@ export default function MessagesList() {
 
             {/* MESSAGE BUBBLE */}
             <div
-              className={`max-w-[78%] rounded-2xl p-3 text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`max-w-[75%] rounded-2xl p-3 text-sm leading-relaxed whitespace-pre-wrap ${
                 m.role === "user"
                   ? "bg-violet-500 text-white rounded-br-none"
                   : "bg-slate-100 text-slate-800 rounded-bl-none"
@@ -103,7 +103,7 @@ export default function MessagesList() {
             )}
 
             {/* Animated dots to show “AI is typing” */}
-            <div className="max-w-[78%] rounded-2xl p-3 text-sm leading-relaxed whitespace-pre-wrap bg-slate-100 text-slate-800 rounded-bl-none">
+            <div className="max-w-[75%] rounded-2xl p-3 text-sm leading-relaxed whitespace-pre-wrap bg-slate-100 text-slate-800 rounded-bl-none">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 bg-slate-600 rounded-full animate-pulse" />
                 <span className="h-2 w-2 bg-slate-600 rounded-full animate-pulse" />
