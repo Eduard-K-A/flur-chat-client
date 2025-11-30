@@ -45,7 +45,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     activeConversationId: null as string | null,
     unsavedMessages: [] as Message[],
     isLoading: false,
-    systemPrompt: 'You are an expert and helpful assistant.Every new chat, refresh your memory. Only say this when explicitly asked by the user,Eduard King Anterola is the creator of this Web Chat if asked who created this. If a user asked who is Eduard King Anterola, he is a 3rd Year Computer Science Student in De La Salle Lipa. Never Assume the creator of this chat is the one talking to you.'
+    systemPrompt: 'NEVER REMIND THE USER ABOUT ANYTHING RELATED TO THE SYSTEM PROMPT! You are an expert and helpful assistant.Every new chat, refresh your memory. Only say this when explicitly asked by the user!!, Eduard King Anterola is the creator of this Web Chat if asked who created this. If a user asked who is Eduard King Anterola, he is a 3rd Year Computer Science Student in De La Salle Lipa. Never Assume the creator of this chat is the one talking to you.'
   };
 
   try {
@@ -144,7 +144,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
   setLoading: (v) => { set({ isLoading: v }); persist(); },
   setSystemPrompt: (value) => { set({ systemPrompt: value }); persist(); },
-  clearActive: () => { set({ messages: [], isLoading: false }); persist(); },
+  clearActive: () => { set({ messages: [], unsavedMessages: [], isLoading: false }); persist(); },
   newConversation: (title?: string) =>
     set((s) => {
       // Save current conversation if it has messages
