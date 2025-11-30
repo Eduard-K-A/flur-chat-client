@@ -6,11 +6,11 @@ import ChatbotSidebar from './components/SideBar'
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="h-screen bg-slate-50 flex overflow-hidden">
       <ChatbotSidebar isOpen={isSidebarOpen} />
 
-      <main className="flex-1 flex flex-col">
-        <header className="p-3 border-b border-slate-200 bg-white flex items-center gap-3">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="p-3 border-b border-slate-200 bg-white flex items-center gap-3 shrink-0">
           <button
             onClick={() => setIsSidebarOpen((v) => !v)}
             className="p-2 rounded-md hover:bg-slate-100 transition-colors"
@@ -19,11 +19,11 @@ function App() {
           </button>
           <div className="text-sm text-slate-500">Flur Chat</div>
         </header>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-y-auto min-h-0 w-full p-0 m-0">
           <MessagesList />
         </div>
 
-        <footer>
+        <footer className='shrink-0'>
           <ChatInput />
         </footer>
       </main>
