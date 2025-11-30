@@ -213,14 +213,14 @@ export default function ChatInput() {
             </label>
 
             {/* System prompt toggle */}
-            <button
+            {/* <button
               type="button"
               onClick={() => setShowSystemEditor((v) => !v)}
               className="p-2.5 rounded-xl text-slate-400 hover:text-violet-500 hover:bg-violet-50 cursor-pointer transition-colors"
               title="Edit system prompt"
             >
               <Sparkles className="w-5 h-5" />
-            </button>
+            </button> */}
 
             {/* MAIN TEXTAREA */}
             <textarea
