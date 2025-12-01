@@ -83,7 +83,7 @@ export default function ChatInput() {
     });
 
     // Clear inputs
-    const userText = text.trim();
+    //const userText = text.trim();
     setText("");
     setImages([]);
 
@@ -141,7 +141,7 @@ export default function ChatInput() {
   const canSend = (text.trim() || images.length > 0) && !isLoading;
 
   return (
-    <div className="p-4 bg-gradient-to-t from-slate-50 to-transparent">
+    <div className="p-4 bg-linear-to-t from-slate-50 to-transparent">
       <div
         className={`
           relative mx-auto max-w-3xl rounded-2xl
@@ -228,7 +228,7 @@ export default function ChatInput() {
             className="flex-1 resize-none bg-transparent text-slate-700 
                        placeholder:text-slate-400 focus:outline-none
                        text-sm leading-relaxed py-2.5 px-1
-                       min-h-[44px] max-h-[200px]"
+                       min-h-11 max-h-[200px]"
             placeholder="Message AI assistant..."
             rows={1}
             value={text}
@@ -259,7 +259,7 @@ export default function ChatInput() {
             className={`
               p-2.5 rounded-xl transition-all duration-200
               ${canSend
-                ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 hover:scale-105 active:scale-95"
+                ? "bg-linear-to-r from-violet-500 to-indigo-500 text-white shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 hover:scale-105 active:scale-95"
                 : "bg-slate-100 text-slate-400 cursor-not-allowed"
               }
             `}
