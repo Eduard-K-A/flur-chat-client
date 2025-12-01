@@ -12,7 +12,7 @@ export default function ChatInput() {
   // Text input, uploaded image list, system editor toggle, textarea focus state
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
-  const [showSystemEditor, setShowSystemEditor] = useState(false);
+  //const [showSystemEditor, setShowSystemEditor] = useState(false); //for editing prompt
   const [isFocused, setIsFocused] = useState(false);
 
   // Zustand state management functions
@@ -271,7 +271,7 @@ export default function ChatInput() {
           </div>
 
           {/* SYSTEM PROMPT EDITOR */}
-          {showSystemEditor && (
+          {/* {showSystemEditor && (
             <div className="p-3 border-b border-slate-100 bg-white">
               <textarea
                 className="w-full rounded-md border border-slate-200 p-2 text-sm resize-none"
@@ -281,7 +281,7 @@ export default function ChatInput() {
                 placeholder="System prompt: instruct the assistant (hidden from chat history)"
               />
             </div>
-          )}
+          )} */}
 
           <div className="px-4 pb-2 flex items-center justify-between text-xs text-slate-400">
             <span>Press Enter to send, Shift+Enter for new line</span>
