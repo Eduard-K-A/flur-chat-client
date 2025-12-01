@@ -22,7 +22,7 @@ export default function ChatInput() {
     setLoading,
     isLoading,
     systemPrompt,
-    setSystemPrompt
+    //setSystemPrompt
   } = useChatStore();
 
   // Converts an uploaded file to a Base64 string for preview + sending
