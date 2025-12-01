@@ -1,296 +1,288 @@
 import { useState } from "react";
 import { Send, Paperclip, X, Image, Sparkles } from "lucide-react";
-import { useChatStore } from "../stores/useChatStore";
-import { sendChat } from "../lib/api";
+import { useChatStore, type MessageContent } from "../stores/useChatStore";
 
 type ImageObject = { type: "image_url"; image_url: { url: string } };
 type TextObject = { type: "text"; text: string };
-type UserContent = ImageObject | TextObject;
-type PayloadMessage = { role: "system" | "user" | "assistant"; content: string | UserContent[] };
 
 export default function ChatInput() {
-  // Text input, uploaded image list, system editor toggle, textarea focus state
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
-  //const [showSystemEditor, setShowSystemEditor] = useState(false); //for editing prompt
   const [isFocused, setIsFocused] = useState(false);
 
-  // Zustand state management functions
   const {
     addMessage,
     appendToLastMessage,
     setLoading,
     isLoading,
-    systemPrompt,
-    //setSystemPrompt
+    getMessagesForAPI,
   } = useChatStore();
 
-  // Converts an uploaded file to a Base64 string for preview + sending
+  // Converts an uploaded file to a Base64 string
   const processImage = (file: File) => {
     const reader = new FileReader();
-
-    // When file is converted → append result to images[]
     reader.onload = () =>
       setImages((prev) => [...prev, reader.result as string]);
-
     reader.readAsDataURL(file);
+  };
+
+  // Local API helper: POST messages and return a streaming reader
+  const sendChat = async (messages: Array<{ role: string; content: any }>) => {
+    const base = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const url = `${base}/api/chat`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`Chat API error: ${res.status} ${txt}`);
+    }
+
+    if (!res.body) throw new Error("Chat API response has no body to stream.");
+
+    return res.body.getReader();
   };
 
   const send = async () => {
     // Prevent sending empty messages
     if (!text.trim() && images.length === 0) return;
 
-    // Build user message content:
-    // - If text exists, add text object
-    // - For each image, push an image_url object
-    const userContent: UserContent[] = text.trim() ? [{ type: "text", text }] : [];
-    images.forEach((img) =>
-      userContent.push({
-        type: "image_url",
-        image_url: { url: img }
-      })
-    );
+    // Build multimodal content for API
+    let messageContent: MessageContent;
+    
+    if (images.length === 0) {
+      // Text-only message
+      messageContent = text.trim();
+    } else {
+      // Multimodal message (text + images)
+      const contentArray: Array<TextObject | ImageObject> = [];
+      
+      if (text.trim()) {
+        contentArray.push({ type: "text", text: text.trim() });
+      }
+      
+      images.forEach((img) => {
+        contentArray.push({
+          type: "image_url",
+          image_url: { url: img }
+        });
+      });
+      
+      messageContent = contentArray;
+    }
 
-    // Add user message to UI history
-    addMessage({ role: "user", content: text, images });
+    // Add user message to store
+    addMessage({ 
+      role: "user", 
+      content: messageContent,
+      images: images.length > 0 ? images : undefined // For UI preview
+    });
 
     // Clear inputs
+    const userText = text.trim();
     setText("");
     setImages([]);
 
-    // Prepare placeholder assistant message that will be streamed into
+    // Create placeholder for assistant response
     setLoading(true);
     addMessage({ role: "assistant", content: "" });
 
-    // -------------------------
-    // BUILDING THE FINAL PAYLOAD
-    // -------------------------
-    // Zustand messages includes the new empty assistant message at the end,
-    // so slice(0, -1) removes that placeholder before sending.
-    const currentMessages = useChatStore.getState().messages.slice(0, -1);
+    try {
+      // Get all messages for API (includes system prompt automatically)
+      const messagesForAPI = getMessagesForAPI();
+      
+      // Remove the empty assistant placeholder we just added
+      const messagesToSend = messagesForAPI.slice(0, -1);
 
-    const payloadMessages: PayloadMessage[] = [];
+      // Send to API
+      const reader = await sendChat(messagesToSend);
+      const decoder = new TextDecoder();
 
-    // Insert system prompt ONLY at the top if it exists
-    // and if it is not already the first message.
-    if (systemPrompt && String(systemPrompt).trim()) {
-      const firstIsSystem = currentMessages[0]?.role === "system";
-      if (!firstIsSystem) {
-        payloadMessages.push({
-          role: "system",
-          content: systemPrompt
-        });
-      }
-    }
+      // Stream the response
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    // Add full chat history
-    payloadMessages.push(...currentMessages);
+        const chunk = decoder.decode(value);
 
-    // Add latest message as either:
-    //   - pure text
-    //   - structured array containing text + images
-    payloadMessages.push({
-      role: "user",
-      content: userContent.length === 1 ? text : userContent
-    });
+        // Parse SSE stream
+        for (const line of chunk.split("\n")) {
+          if (line.startsWith("data: ")) {
+            const json = line.slice(6).trim();
 
-    // -------------------------
-    // STREAMING RESPONSE HANDLING
-    // -------------------------
-    const reader = await sendChat(payloadMessages);
-    const decoder = new TextDecoder();
+            if (json === "[DONE]") continue;
 
-    while (true) {
-      // Read server-sent-event (SSE) stream chunks
-      const { done, value } = await reader.read();
-      if (done) break;
+            try {
+              const parsed = JSON.parse(json);
+              const token = parsed.choices?.[0]?.delta?.content || "";
 
-      const chunk = decoder.decode(value);
-
-      // SSE sends lines like "data: {json}"
-      for (const line of chunk.split("\n")) {
-        if (line.startsWith("data: ")) {
-          const json = line.slice(6);
-
-          // Stop when server indicates the end of stream
-          if (json === "[DONE]") continue;
-
-          try {
-            const parsed = JSON.parse(json);
-
-            // Extract token from streaming SSE delta structure
-            const token = parsed.choices[0]?.delta?.content || "";
-
-            // Append token live to the last assistant message
-            if (token) appendToLastMessage(token);
-          } catch {
-            // Ignore malformed chunks
+              if (token) {
+                appendToLastMessage(token);
+              }
+            } catch (err) {
+              console.error("Failed to parse SSE chunk:", err);
+            }
           }
         }
       }
+    } catch (error) {
+      console.error("Chat error:", error);
+      appendToLastMessage("\n\n❌ Error: Failed to get response from server. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  // Conditions for enabling the send button
+  // Enable send button if there's content and not currently loading
   const canSend = (text.trim() || images.length > 0) && !isLoading;
 
   return (
-    <>
-      <div className="p-4 bg-linear-to-t from-slate-50 to-transparent">
-        <div
-          className={`
-            relative mx-auto max-w-3xl rounded-2xl
-            bg-white shadow-lg shadow-slate-200/50
-            border transition-all duration-300
-            ${isFocused ? "border-violet-400 ring-4 ring-violet-100" : "border-slate-200"}
-          `}
-        >
-          {/* IMAGE PREVIEW STRIP */}
-          {images.length > 0 && (
-            <div className="p-3 border-b border-slate-100">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {images.map((img, i) => (
-                  <div
-                    key={i}
-                    className="relative group shrink-0 rounded-xl overflow-hidden"
-                  >
-                    <img src={img} className="h-20 w-20 object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                    {/* Remove image */}
-                    <button
-                      onClick={() =>
-                        setImages((prev) => prev.filter((_, idx) => idx !== i))
-                      }
-                      className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white 
-                                 opacity-0 group-hover:opacity-100 transition-all
-                                 hover:bg-red-500 hover:scale-110"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-
-                {/* Image Upload Button */}
-                <label
-                  className="shrink-0 h-20 w-20 rounded-xl border-2 border-dashed 
-                             border-slate-200 hover:border-violet-300 hover:bg-violet-50
-                             flex items-center justify-center cursor-pointer transition-colors"
+    <div className="p-4 bg-gradient-to-t from-slate-50 to-transparent">
+      <div
+        className={`
+          relative mx-auto max-w-3xl rounded-2xl
+          bg-white shadow-lg shadow-slate-200/50
+          border transition-all duration-300
+          ${isFocused ? "border-violet-400 ring-4 ring-violet-100" : "border-slate-200"}
+        `}
+      >
+        {/* IMAGE PREVIEW STRIP */}
+        {images.length > 0 && (
+          <div className="p-3 border-b border-slate-100">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {images.map((img, i) => (
+                <div
+                  key={i}
+                  className="relative group shrink-0 rounded-xl overflow-hidden"
                 >
-                  <Image className="w-6 h-6 text-slate-400" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) =>
-                      e.target.files &&
-                      Array.from(e.target.files).forEach(processImage)
-                    }
+                  <img 
+                    src={img} 
+                    alt={`Upload ${i + 1}`}
+                    className="h-20 w-20 object-cover" 
                   />
-                </label>
-              </div>
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                  {/* Remove image button */}
+                  <button
+                    onClick={() =>
+                      setImages((prev) => prev.filter((_, idx) => idx !== i))
+                    }
+                    className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white 
+                               opacity-0 group-hover:opacity-100 transition-all
+                               hover:bg-red-500 hover:scale-110"
+                    aria-label="Remove image"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+
+              {/* Add more images button */}
+              <label
+                className="shrink-0 h-20 w-20 rounded-xl border-2 border-dashed 
+                           border-slate-200 hover:border-violet-300 hover:bg-violet-50
+                           flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <Image className="w-6 h-6 text-slate-400" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) =>
+                    e.target.files &&
+                    Array.from(e.target.files).forEach(processImage)
+                  }
+                />
+              </label>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* INPUT AREA */}
-          <div className="flex items-end gap-2 p-2">
-            {/* Attach images */}
-            <label className="p-2.5 rounded-xl text-slate-400 hover:text-violet-500 hover:bg-violet-50 cursor-pointer transition-colors">
-              <Paperclip className="w-5 h-5" />
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) =>
-                  e.target.files &&
-                  Array.from(e.target.files).forEach(processImage)
-                }
-              />
-            </label>
-
-            {/* System prompt toggle */}
-            {/* <button
-              type="button"
-              onClick={() => setShowSystemEditor((v) => !v)}
-              className="p-2.5 rounded-xl text-slate-400 hover:text-violet-500 hover:bg-violet-50 cursor-pointer transition-colors"
-              title="Edit system prompt"
-            >
-              <Sparkles className="w-5 h-5" />
-            </button> */}
-
-            {/* MAIN TEXTAREA */}
-            <textarea
-              className="flex-1 resize-none bg-transparent text-slate-700 
-                         placeholder:text-slate-400 focus:outline-none
-                         text-sm leading-relaxed py-2.5 px-1
-                         min-h-11 max-h-[200px]"
-              placeholder="Message AI assistant..."
-              rows={1}
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-
-                // Auto-resize height up to max 200px
-                e.target.style.height = "auto";
-                e.target.style.height =
-                  Math.min(e.target.scrollHeight, 200) + "px";
-              }}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              onKeyDown={(e) => {
-                // Enter = send, Shift+Enter = new line
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
+        {/* INPUT AREA */}
+        <div className="flex items-end gap-2 p-2">
+          {/* Attach images button */}
+          <label 
+            className="p-2.5 rounded-xl text-slate-400 hover:text-violet-500 hover:bg-violet-50 cursor-pointer transition-colors"
+            title="Attach images"
+          >
+            <Paperclip className="w-5 h-5" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) =>
+                e.target.files &&
+                Array.from(e.target.files).forEach(processImage)
+              }
             />
+          </label>
 
-            {/* SEND BUTTON */}
-            <button
-              onClick={send}
-              disabled={!canSend}
-              className={`
-                p-2.5 rounded-xl transition-all duration-200
-                ${canSend
-                  ? "bg-linear-to-r from-violet-500 to-indigo-500 text-white shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 hover:scale-105 active:scale-95"
-                  : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                }
-              `}
-            >
-              {isLoading ? (
-                <Sparkles className="w-5 h-5 animate-pulse" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
-          </div>
+          {/* MAIN TEXTAREA */}
+          <textarea
+            className="flex-1 resize-none bg-transparent text-slate-700 
+                       placeholder:text-slate-400 focus:outline-none
+                       text-sm leading-relaxed py-2.5 px-1
+                       min-h-[44px] max-h-[200px]"
+            placeholder="Message AI assistant..."
+            rows={1}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
 
-          {/* SYSTEM PROMPT EDITOR */}
-          {/* {showSystemEditor && (
-            <div className="p-3 border-b border-slate-100 bg-white">
-              <textarea
-                className="w-full rounded-md border border-slate-200 p-2 text-sm resize-none"
-                rows={3}
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="System prompt: instruct the assistant (hidden from chat history)"
-              />
-            </div>
-          )} */}
+              // Auto-resize height
+              e.target.style.height = "auto";
+              e.target.style.height =
+                Math.min(e.target.scrollHeight, 200) + "px";
+            }}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onKeyDown={(e) => {
+              // Enter = send, Shift+Enter = new line
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (canSend) send();
+              }
+            }}
+            disabled={isLoading}
+          />
 
-          <div className="px-4 pb-2 flex items-center justify-between text-xs text-slate-400">
-            <span>Press Enter to send, Shift+Enter for new line</span>
-            {images.length > 0 && (
-              <span className="text-violet-500">{images.length} image(s) attached</span>
+          {/* SEND BUTTON */}
+          <button
+            onClick={send}
+            disabled={!canSend}
+            className={`
+              p-2.5 rounded-xl transition-all duration-200
+              ${canSend
+                ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300 hover:scale-105 active:scale-95"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+              }
+            `}
+            aria-label="Send message"
+          >
+            {isLoading ? (
+              <Sparkles className="w-5 h-5 animate-pulse" />
+            ) : (
+              <Send className="w-5 h-5" />
             )}
-          </div>
+          </button>
+        </div>
+
+        {/* FOOTER INFO */}
+        <div className="px-4 pb-2 flex items-center justify-between text-xs text-slate-400">
+          <span>Press Enter to send, Shift+Enter for new line</span>
+          {images.length > 0 && (
+            <span className="text-violet-500 font-medium">
+              {images.length} image{images.length !== 1 ? "s" : ""} attached
+            </span>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
