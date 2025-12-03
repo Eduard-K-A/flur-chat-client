@@ -28,7 +28,7 @@ export default function ChatInput() {
 
   // Local API helper: POST messages and return a streaming reader
   const sendChat = async (messages: Array<{ role: string; content: any }>) => {
-    const base = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const base = (import.meta.env.VITE_API_BASE as string) ?? "";
     const url = `${base}/api/chat`;
 
     const res = await fetch(url, {
