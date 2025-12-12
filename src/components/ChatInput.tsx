@@ -28,7 +28,8 @@ export default function ChatInput() {
 
   // Local API helper: POST messages and return a streaming reader
   const sendChat = async (messages: Array<{ role: string; content: any }>) => {
-    const base = (import.meta.env.VITE_API_BASE as string) ?? "";
+    //const base = (import.meta.env.VITE_API_BASE as string) || "http://localhost:3001";
+    const base = "http://localhost:3001";
     const url = `${base}/api/chat`;
 
     const res = await fetch(url, {
@@ -89,14 +90,15 @@ export default function ChatInput() {
 
     // Create placeholder for assistant response
     setLoading(true);
-    addMessage({ role: "assistant", content: "" });
+    //addMessage({ role: "assistant", content: "" }); -temp removed to fix double message issue
+
+    let firstToken = true;
 
     try {
       // Get all messages for API (includes system prompt automatically)
       const messagesForAPI = getMessagesForAPI();
-      
-      // Remove the empty assistant placeholder we just added
-      const messagesToSend = messagesForAPI.slice(0, -1);
+      // No assistant placeholder is added before streaming; send the current messages as-is
+      const messagesToSend = messagesForAPI;
 
       // Send to API
       const reader = await sendChat(messagesToSend);
@@ -116,22 +118,32 @@ export default function ChatInput() {
 
             if (json === "[DONE]") continue;
 
-            try {
-              const parsed = JSON.parse(json);
-              const token = parsed.choices?.[0]?.delta?.content || "";
+              try {
+                const parsed = JSON.parse(json);
+                const token = parsed.choices?.[0]?.delta?.content || "";
 
-              if (token) {
-                appendToLastMessage(token);
+                if (token) {
+                  if (firstToken) {
+                    addMessage({ role: "assistant", content: token });
+                    firstToken = false;
+                  } else {
+                    appendToLastMessage(token);
+                  }
+                }
+              } catch (err) {
+                console.error("Failed to parse SSE chunk:", err);
               }
-            } catch (err) {
-              console.error("Failed to parse SSE chunk:", err);
-            }
           }
         }
       }
     } catch (error) {
       console.error("Chat error:", error);
-      appendToLastMessage("\n\n❌ Error: Failed to get response from server. Please try again.");
+      // If no token was ever received, create an assistant message with the error
+      if (firstToken) {
+        addMessage({ role: "assistant", content: "\n\n❌ Error: Failed to get response from server. Please try again." });
+      } else {
+        appendToLastMessage("\n\n❌ Error: Failed to get response from server. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
