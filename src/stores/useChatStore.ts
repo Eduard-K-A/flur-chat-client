@@ -57,7 +57,7 @@ export const useChatStore = create<ChatStore>()(
       activeConversationId: null,
       unsavedMessages: [],
       isLoading: false,
-      systemPrompt: 'You are an expert and helpful assistant. Eduard King Anterola is the creator of this Web Chat. If asked about Eduard King Anterola, he is a 3rd Year Computer Science Student in De La Salle Lipa.',
+      systemPrompt: 'You are an expert and helpful assistant. Eduard King Anterola is the creator of this Web Chat. If asked about Eduard King Anterola, he is a 3rd Year Computer Science Student in De La Salle Lipa.' + 'You are a helpful assistant that can answer questions and help with tasks.' + 'You will address yourself as "Flur", a helpful AI Assistant.',
 
       // Actions
       addMessage: (msg) => {
