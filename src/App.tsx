@@ -78,7 +78,7 @@ function App() {
             </button>
 
             {/* Settings button opens modal */}
-            <SettingsButton onClick={() => setShowSettings(true)} />
+            {/* <SettingsButton onClick={() => setShowSettings(true)} /> */}
           </div>
         </header>
 
