@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import ChatInput from "./components/ChatInput";
 import MessagesList from "./components/MessagesList";
 import ChatbotSidebar from "./components/SideBar";
-import SettingsButton from "./Buttons/SettingsButton";
 import Settings from "./settings/Settings";
 
 type Theme = "light" | "dark";
@@ -23,11 +22,7 @@ function App() {
   }, [theme]);
 
   return (
-    <div
-      className={`h-screen flex overflow-hidden ${
-        theme === "dark" ? "bg-slate-900" : "bg-slate-50"
-      }`}
-    >
+    <div className="h-screen flex overflow-hidden">
       <ChatbotSidebar isOpen={isSidebarOpen} />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -76,9 +71,6 @@ function App() {
               />
               <span>{theme === "dark" ? "Dark" : "Light"} mode</span>
             </button>
-
-            {/* Settings button opens modal */}
-            {/* <SettingsButton onClick={() => setShowSettings(true)} /> */}
           </div>
         </header>
 
