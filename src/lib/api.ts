@@ -8,7 +8,7 @@ export type Message = {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  images?: string[]; // base64 previews
+  images?: string[]; 
 };
 
 export type Conversation = {
